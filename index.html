@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoutMerge Web | Automador</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root { --bg: #f1f5f9; --text: #1e293b; --primary: #0f172a; --primary-hover: #334155; --accent: #2563eb; --border: #cbd5e1; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background-color: var(--bg); color: var(--text); padding: 30px 20px; margin: 0; display: flex; justify-content: center; }
+        .app-wrapper { width: 100%; max-width: 900px; }
+        .header-title { font-size: 1.8rem; font-weight: 700; color: var(--primary); margin-bottom: 20px; text-align: center; letter-spacing: -0.5px; }
+        
+        .grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+        @media (max-width: 768px) { .grid-layout { grid-template-columns: 1fr; } }
+        
+        .panel { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid var(--border); }
+        .panel h3 { margin-top: 0; font-size: 1.1rem; color: var(--primary); border-bottom: 2px solid var(--bg); padding-bottom: 10px; margin-bottom: 15px; }
+        
+        .csv-zone { border: 2px dashed var(--border); padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 15px; background: #f8fafc; transition: 0.2s; position: relative; }
+        .csv-zone:hover { border-color: var(--accent); }
+        .csv-zone input[type=file] { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        
+        .checkbox-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid var(--border); }
+        .checkbox-group label { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.95rem; cursor: pointer; color: var(--primary); }
+        .checkbox-group input { width: 20px; height: 20px; cursor: pointer; accent-color: var(--accent); }
+
+        .btn { border: none; padding: 12px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 1rem; width: 100%; display: flex; justify-content: center; align-items: center; gap: 8px; }
+        .btn-start { background-color: var(--accent); color: white; margin-top: 20px; }
+        .btn-start:hover { background-color: #1d4ed8; }
+        .btn-pause { background-color: var(--warning); color: white; display: none; margin-top: 10px; }
+        .btn-stop { background-color: var(--danger); color: white; display: none; margin-top: 10px; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); display: none; margin-top: 10px; }
+        
+        .bottom-dashboard { margin-top: 20px; background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid var(--border); display: none; }
+        .status-highlight { font-size: 1.1rem; font-weight: 600; color: var(--primary); text-align: center; margin-bottom: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+        .stat-card { background: var(--bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; }
+        .stat-card span:first-child { font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
+        .stat-card .stats-val { font-size: 1.1rem; color: var(--primary); font-weight: 700; }
+        
+        /* Estilo do Log de Erro */
+        .error-container { margin-top: 15px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px; display: none; }
+        .error-title { color: var(--danger); font-size: 0.8rem; font-weight: 700; margin-bottom: 5px; text-transform: uppercase; }
+        #errorList { max-height: 100px; overflow-y: auto; font-size: 0.75rem; color: #991b1b; padding-left: 20px; margin: 0; }
+
+        progress { width: 100%; height: 8px; border-radius: 4px; display: none; margin-top: 20px; }
+        progress::-webkit-progress-bar { background-color: var(--border); border-radius: 4px; }
+        progress::-webkit-progress-value { background-color: var(--accent); border-radius: 4px; }
+        
+        #downloads { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .btn-download { background: var(--success); color: white; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; text-align: center; font-size: 0.95rem; }
+
+        .watermark-ui { position: fixed; bottom: 15px; right: 20px; font-size: 0.85rem; color: #94a3b8; font-weight: 500; text-decoration: none; transition: 0.3s; }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper">
+        <div class="header-title">CoutMerge Web</div>
+        
+        <div class="grid-layout">
+            <div class="panel">
+                <h3>1. Regras de Processamento</h3>
+                <div class="csv-zone" id="csvZone">
+                    <span id="csvName">📄 Anexar Planilha CSV (Opcional)</span>
+                    <br><small style="color: #64748b;">NOME ATUAL | NOVO NOME | LOTE</small>
+                    <input type="file" id="csvInput" accept=".csv">
+                </div>
+                <div class="checkbox-group">
+                    <label><input type="checkbox" id="chkMerge" checked> Mesclar PDFs e Imagens</label>
+                    <label><input type="checkbox" id="chkRename" checked> Renomear nomes pelo CSV</label>
+                    <label><input type="checkbox" id="chkLot" checked> Organizar ZIPs por Lote</label>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>2. Execução</h3>
+                <div class="csv-zone" style="background: #e0f2fe; border-color: #7dd3fc;">
+                    <span id="filesCountUI" style="font-weight: 600;">📁 Selecionar Arquivos Brutos</span>
+                    <input type="file" id="fileInput" multiple accept=".pdf, .jpg, .jpeg, .png">
+                </div>
+                <button class="btn btn-outline" id="btnExportCsv" style="display: none; border-color: var(--success); color: var(--success); border-width: 2px;">📥 Gerar Planilha Base</button>
+                <button class="btn btn-start" id="startBtn">▶️ Iniciar Processamento</button>
+                <button class="btn btn-pause" id="pauseBtn">⏸️ Pausar</button>
+                <button class="btn btn-stop" id="stopBtn">⏹️ Parar</button>
+                <button class="btn btn-outline" id="clearBtn">🧹 Limpar Interface</button>
+            </div>
+        </div>
+
+        <div class="bottom-dashboard" id="bottomDashboard">
+            <div class="status-highlight" id="stStatus">Aguardando...</div>
+            <div class="stats-grid">
+                <div class="stat-card"><span>Lote</span><span class="stats-val" id="stBatchName">-</span></div>
+                <div class="stat-card"><span>Lido</span><span class="stats-val" id="stProgress">0/0</span></div>
+                <div class="stat-card"><span>Gerados</span><span class="stats-val" id="stGenerated" style="color: var(--success);">0</span></div>
+                <div class="stat-card"><span>Erros/Ignorados</span><span class="stats-val" id="stErrors" style="color: var(--danger);">0</span></div>
+                <div class="stat-card"><span>Restante</span><span class="stats-val" id="stEta">00:00</span></div>
+            </div>
+
+            <div class="error-container" id="errorContainer">
+                <div class="error-title">⚠️ Arquivos Pulados (Erro de Leitura):</div>
+                <ul id="errorList"></ul>
+            </div>
+            
+            <progress id="progressBar" value="0" max="100"></progress>
+            <div id="downloads"></div>
+        </div>
+    </div>
+
+    <a href="#" class="watermark-ui">Desenvolvido por Breno Coutinho</a>
+
+    <script>
+        const yieldToBrowser = (ms = 10) => new Promise(resolve => setTimeout(resolve, ms));
+        const formatTime = (ms) => {
+            if (!ms || ms === Infinity || isNaN(ms)) return "Calculando...";
+            const s = Math.floor(ms / 1000);
+            return `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
+        };
+
+        const cleanExcelString = (str) => {
+            if(!str) return "";
+            return str.replace(/^="(.+)"$/, '$1').replace(/^"(.+)"$/, '$1').trim();
+        };
+
+        let isPaused = false, isStopped = false;
+        let generatedUrls = [];
+        let csvDatabase = {}; 
+        let rawFiles = [];
+
+        // LEITURA DO CSV
+        document.getElementById('csvInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('csvName').innerText = `✅ CSV Carregado: ${file.name}`;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const text = event.target.result;
+                    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+                    if(lines.length < 2) return;
+                    const sep = lines[0].includes(';') ? ';' : ',';
+                    const headers = lines[0].split(sep).map(h => cleanExcelString(h).toUpperCase());
+                    const idxAtual = headers.indexOf('NOME ATUAL'), idxNovo = headers.indexOf('NOVO NOME'), idxLote = headers.indexOf('LOTE');
+
+                    csvDatabase = {};
+                    for(let i = 1; i < lines.length; i++) {
+                        const cols = lines[i].split(sep).map(c => cleanExcelString(c));
+                        if(idxAtual > -1 && cols[idxAtual]) {
+                            csvDatabase[cols[idxAtual]] = {
+                                novoNome: idxNovo > -1 && cols[idxNovo] ? cols[idxNovo] : cols[idxAtual],
+                                lote: idxLote > -1 && cols[idxLote] ? cols[idxLote] : ''
+                            };
+                        }
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            rawFiles = Array.from(e.target.files);
+            if(rawFiles.length > 0) {
+                document.getElementById('filesCountUI').innerText = `✅ ${rawFiles.length} Arquivos Selecionados`;
+                document.getElementById('btnExportCsv').style.display = 'flex';
+            }
+        });
+
+        // COMPRESSÃO DE IMAGEM (Melhorada para evitar crash de canvas)
+        const compressImage = (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.src = e.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let w = img.width, h = img.height;
+                        const max = 1500;
+                        if (w > max || h > max) {
+                            if (w > h) { h = Math.round((h * max) / w); w = max; } 
+                            else { w = Math.round((w * max) / h); h = max; }
+                        }
+                        canvas.width = w; canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+                        canvas.toBlob(blob => blob.arrayBuffer().then(resolve), 'image/jpeg', 0.7);
+                    };
+                    img.onerror = reject;
+                };
+            });
+        };
+
+        // CONTROLES
+        document.getElementById('pauseBtn').addEventListener('click', (e) => {
+            isPaused = !isPaused;
+            e.target.innerHTML = isPaused ? "▶️ Retomar" : "⏸️ Pausar";
+        });
+        document.getElementById('stopBtn').addEventListener('click', () => isStopped = true);
+
+        // MOTOR PRINCIPAL
+        document.getElementById('startBtn').addEventListener('click', async () => {
+            if (rawFiles.length === 0) return alert("Selecione os arquivos primeiro!");
+
+            const { PDFDocument } = PDFLib;
+            const optMerge = document.getElementById('chkMerge').checked;
+            const optRename = document.getElementById('chkRename').checked;
+            const optLot = document.getElementById('chkLot').checked;
+
+            // Setup UI
+            document.getElementById('startBtn').style.display = 'none';
+            document.getElementById('pauseBtn').style.display = 'block';
+            document.getElementById('stopBtn').style.display = 'block';
+            document.getElementById('bottomDashboard').style.display = 'block';
+            document.getElementById('progressBar').style.display = 'block';
+            document.getElementById('errorContainer').style.display = 'none';
+            document.getElementById('errorList').innerHTML = '';
+            
+            isPaused = false; isStopped = false;
+            let totalPdfsGenerated = 0, totalErrors = 0, processedCount = 0;
+            const startTime = Date.now();
+
+            // Mapeamento de Lotes (Igual ao seu raciocínio original)
+            const lotsMap = {};
+            rawFiles.forEach(file => {
+                const nameParts = file.name.split('.');
+                const ext = nameParts.pop().toLowerCase();
+                const nameWithoutExt = nameParts.join('.');
+                let baseName = nameWithoutExt, index = 0, isPD = false;
+
+                const match = nameWithoutExt.match(/^(.+)_PD(\d+)$/i);
+                if (match) { baseName = match[1]; index = parseInt(match[2]); isPD = true; }
+
+                let finalName = baseName;
+                let lotName = optLot ? "Diversos" : "Processamento_Geral";
+                if (csvDatabase[baseName]) {
+                    if (optRename) finalName = csvDatabase[baseName].novoNome;
+                    if (optLot && csvDatabase[baseName].lote) lotName = csvDatabase[baseName].lote;
+                }
+
+                const clientKey = (optMerge && isPD) ? baseName : file.name;
+                if (!lotsMap[lotName]) lotsMap[lotName] = {};
+                if (!lotsMap[lotName][clientKey]) lotsMap[lotName][clientKey] = { items: [], totalSize: 0, finalName, baseName };
+                
+                lotsMap[lotName][clientKey].items.push({ file, index, ext, originalName: file.name, isPD });
+                lotsMap[lotName][clientKey].totalSize += file.size;
+            });
+
+            // Batching de segurança (100MB por ZIP)
+            const safeBatches = [];
+            for (const [lotName, clients] of Object.entries(lotsMap)) {
+                let cur = { lotName, part: 1, clientsData: [], size: 0 };
+                for (const key in clients) {
+                    if (cur.size + clients[key].totalSize > 100 * 1024 * 1024) {
+                        safeBatches.push(cur);
+                        cur = { lotName, part: cur.part + 1, clientsData: [], size: 0 };
+                    }
+                    cur.clientsData.push(clients[key]);
+                    cur.size += clients[key].totalSize;
+                }
+                safeBatches.push(cur);
+            }
+
+            for (const batch of safeBatches) {
+                if (isStopped) break;
+                const zip = new JSZip();
+                document.getElementById('stBatchName').innerText = batch.lotName;
+
+                for (const cData of batch.clientsData) {
+                    if (isStopped) break;
+                    while (isPaused) { await yieldToBrowser(500); }
+
+                    document.getElementById('stStatus').innerText = `Lendo: ${cData.baseName}`;
+                    
+                    try {
+                        if (optMerge && cData.items[0].isPD) {
+                            const items = cData.items.sort((a, b) => a.index - b.index);
+                            const mergedPdf = await PDFDocument.create();
+                            let addedPages = 0;
+
+                            for (const item of items) {
+                                try {
+                                    const buf = await item.file.arrayBuffer();
+                                    if (item.ext === 'pdf') {
+                                        const pdf = await PDFDocument.load(buf, { ignoreEncryption: true });
+                                        const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                                        pages.forEach(p => mergedPdf.addPage(p));
+                                        addedPages++;
+                                    } else {
+                                        const imgBuf = await compressImage(item.file);
+                                        const image = item.ext === 'png' ? await mergedPdf.embedPng(imgBuf) : await mergedPdf.embedJpg(imgBuf);
+                                        const p = mergedPdf.addPage([595.28, 841.89]);
+                                        const dims = image.scale(1);
+                                        const sc = Math.min(555.28 / dims.width, 801.89 / dims.height);
+                                        p.drawImage(image, { x: (595.28 - dims.width * sc) / 2, y: (841.89 - dims.height * sc) / 2, width: dims.width * sc, height: dims.height * sc });
+                                        addedPages++;
+                                    }
+                                } catch (e) {
+                                    totalErrors++;
+                                    document.getElementById('errorContainer').style.display = 'block';
+                                    document.getElementById('errorList').innerHTML += `<li>${item.originalName} (Arquivo corrompido ou protegido)</li>`;
+                                }
+                                processedCount++;
+                                document.getElementById('progressBar').value = (processedCount / rawFiles.length) * 100;
+                                document.getElementById('stProgress').innerText = `${processedCount} / ${rawFiles.length}`;
+                                document.getElementById('stEta').innerText = formatTime((rawFiles.length - processedCount) / (processedCount / (Date.now() - startTime)));
+                                await yieldToBrowser(5);
+                            }
+                            if (addedPages > 0) {
+                                zip.file(`${cData.finalName}.pdf`, await mergedPdf.save());
+                                totalPdfsGenerated++;
+                            }
+                        } else {
+                            // Arquivo único
+                            const item = cData.items[0];
+                            zip.file(item.isPD ? `${cData.finalName}_PD${item.index}.${item.ext}` : `${cData.finalName}.${item.ext}`, item.file);
+                            processedCount++;
+                            totalPdfsGenerated++;
+                        }
+                    } catch (err) {
+                        console.error(err);
+                    }
+                    document.getElementById('stGenerated').innerText = totalPdfsGenerated;
+                    document.getElementById('stErrors').innerText = totalErrors;
+                }
+
+                if (Object.keys(zip.files).length > 0) {
+                    const content = await zip.generateAsync({ type: "blob" });
+                    const url = URL.createObjectURL(content);
+                    generatedUrls.push(url);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `${batch.lotName}_${batch.part}.zip`;
+                    link.className = 'btn-download';
+                    link.innerText = `📦 Baixar ${batch.lotName} (P${batch.part})`;
+                    document.getElementById('downloads').appendChild(link);
+                    link.click();
+                }
+            }
+            document.getElementById('stStatus').innerText = isStopped ? "Interrompido." : "Concluído!";
+            document.getElementById('clearBtn').style.display = 'block';
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', () => location.reload());
+    </script>
+</body>
+</html>
